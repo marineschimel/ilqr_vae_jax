@@ -228,7 +228,7 @@ class iLQR(Encoder):
             return jnp.sum(-lik_term- prior_term)
 
         def costf(x, theta):
-            return self.lik_module.log_likelihood_t(
+            return -self.lik_module.log_likelihood_t(
                 params.likelihood_params, x, os[-1]
             )
 
@@ -360,7 +360,9 @@ class ParalleliLQR(Encoder):
             return jnp.sum(-lik_term- prior_term)
 
         def costf(x, theta):
-            return 0.0
+            return -self.lik_module.log_likelihood_t(
+                params.likelihood_params, x, os[-1]
+            )
 
         def dynamics(t, x, u, params):
             dyn_term = jnp.where(t < self.n_beg, x + self.bbeg_mat[t]@u, self.dyn_module.dynamics_t(params.dyn_params, x, u, t, ext_us[t]))
