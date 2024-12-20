@@ -83,6 +83,7 @@ class IDCoupling(Coupler):
         return (xs, us, us_mean, us_logstd)
 
 class ParallelIDCoupling(Coupler):
+    '''This is the same as the IDCoupling but for the parallel model setting. It uses vmap for the sampling instead of doing it inside the scan'''
     def __init__(self, dims):
         self.dims = dims
         self.m = self.dims.m

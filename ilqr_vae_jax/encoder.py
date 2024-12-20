@@ -294,7 +294,11 @@ class iLQR(Encoder):
 
 class ParalleliLQR(Encoder):
     '''The iLQR encoder uses iLQR to infer the initial condition and the control inputs.
-    The induced posterior latent trajectories are the same as would be output by an iterative extended kalman filter.'''
+    The induced posterior latent trajectories are the same as would be output by an iterative extended kalman filter.
+    In the parallel version of the iLQR algorithm, if we are running the model on GPU, the linearized dynamics and the feedback gains are computed in parallel instead of being
+    computed sequentially. This can be faster than the sequential version if the sequence length is long enough. Note however that 
+    the memory can become a bottleneck, such that the parallel version is not always faster than the sequential version, even for very long sequences.
+    Case-by-case testing is required to assess which version is better.'''
     def __init__(
         self,
         likelihood: Likelihood,
