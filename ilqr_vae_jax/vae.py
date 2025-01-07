@@ -275,7 +275,6 @@ class VAE:
                 kl_warmup = self.get_kl_warmup_fun()(
                     epoch * self.training_hparams.total_num_datapoints + num_batches
                 )
-                time_pre_train = time.time()
                 (
                     (params, grads),
                     opt_state,
@@ -303,11 +302,7 @@ class VAE:
                 print(
                     f"epoch {epoch} | time = {time.time() - start}| loss: {total_loss / num_batches} ~ ll: {total_ll/ num_batches}. entropy: {total_entropy / num_batches}. log_prior: {total_lp/ num_batches}"
                 )
-                # if self.params:
-                #   print(f"the eigenvalues are {jnp.linalg.eigvals(self.params.dyn_params.a)}")
-                #   print()
             total_loss, total_ll, total_entropy, total_lp = 0.0, 0.0, 0.0, 0.0
-            # if batch_num % self.save_every == 0:
             keys = jax.random.split(key, num_test_datapoints)
             time_pre_sample = time.time()
             u_samples, x_samples, pre_o_samples, (test_lls, lls, entropies, lps) = (
