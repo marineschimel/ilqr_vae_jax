@@ -7,23 +7,12 @@ We implement several options for the prior over inputs, the dynamics, and the li
 We also implement two options for the encoder in the VAE : one implements the  [ilQR-VAE paper](https://openreview.net/forum?id=wRODLDHaAiW) and uses the iLQR algorithm to perform inference over the inputs, while the other one uses a biRNN, as in the [LFADS paper](https://www.nature.com/articles/s41592-018-0109-9).
 
 
-It contains an implementation of the in Jax, as well as the building blocks to fit an LFADS
 
 ## Features
 
-- **VAE module**: 
-- **Custom Dynamics, Prior and Likelihood Models**: Easily extendable to different dynamics and likelihood models.
-- **iLQR encoder module**: iLQR algorithm for trajectory optimization.
-- **LFADS encoder/controller**: We
+- **VAE module**: The main VAE module is implemented in the vae.py file. 
+- **Custom Dynamics, Prior and Likelihood Models**: Different choices for these modules can be found in the dynamics, prior, and likelihood files. 
+- **Custom encoder module**: Two potential encoders are implemented -- an iLQR-based encoder and a biRNN-based encoder. 
 
 
-## Installation
-
-To install the required dependencies, run:
-
-```sh
-pip install matplotlib scipy jax numpy joblib optax imageio pillow ipython
-
-
-Requirements : 
-- 
+## Requirements
