@@ -89,6 +89,7 @@ class Dynamics(object):
 
 # flax pytree
 class VRNN(Dynamics):
+    """ Thismodule implements vanilla RNN dynamics of the form x(t+1) = A\Phi(x(t)) +Bu(t) + B_p p(t)"""
     def __init__(self, phi: Callable[[jnp.ndarray], jnp.ndarray], dims: Dims, rad=0.7):
         self.dims = dims
         self.phi = phi
@@ -131,7 +132,7 @@ class VRNN(Dynamics):
 
 class MGU(Dynamics):
     def __init__(
-        self, dims=None, phi: Callable = jax.nn.sigmoid, rho: Callable = jnp.tanh, rad = 0.1,
+        self, dims=None, phi: Callable = jax.nn.sigmoid, rho: Callable = jnp.tanh, rad = 0.9,
     ):
         """Minimal Gated Unit
 
@@ -183,7 +184,7 @@ class GRU(Dynamics):
         dims: Dims = None,
         phi: Callable = jax.nn.sigmoid,
         rho: Callable = jnp.tanh,
-        rad: float = 0.8,
+        rad: float = 0.9, #default to a high spectral radius to help training
     ):
         self.dims = dims
         self.phi = phi
@@ -191,7 +192,6 @@ class GRU(Dynamics):
         self.rad = rad
         self.m_ext = self.dims.m
 
-    #alpha R + (1 alpha)*R
     def initialize_params(self, key) -> GRUParams:
         key, skeys = keygen(key, 7)
         wzx = self.rad * jr.normal(next(skeys), (self.dims.n, self.dims.n))/jnp.sqrt(self.dims.n)
@@ -227,125 +227,10 @@ class GRU(Dynamics):
         return xs  # jnp.concatenate([x0[None,...], xs[:-1]])
 
 
-class GRU_Ext(Dynamics):
-    def __init__(
-        self,
-        dims: Dims = None,
-        phi: Callable = jax.nn.sigmoid,
-        rho: Callable = jnp.tanh,
-        rad: float = 0.1,
-        ext_inputs: bool = False, 
-        m_ext: Optional[int] = None
-    ):
-        self.dims = dims
-        self.phi = phi
-        self.rho = rho
-        self.rad = rad
-        self.ext_inputs = ext_inputs
-        self.m_ext = self.dims.n if m_ext is None else m_ext
 
-    def initialize_params(self, key) -> GRUParams:
-        key, skeys = keygen(key, 7)
-        wzx = self.rad * jr.normal(next(skeys), (self.dims.n, self.dims.n))/jnp.sqrt(self.dims.n)
-        wzu = self.rad * jr.normal(next(skeys), (self.dims.n, self.dims.m))/jnp.sqrt(self.dims.n)
-        wrx = self.rad * jr.normal(next(skeys), (self.dims.n, self.dims.n))/jnp.sqrt(self.dims.n)
-        wru = self.rad * jr.normal(next(skeys), (self.dims.n, self.dims.m))/jnp.sqrt(self.dims.n)
-        whx = self.rad * jr.normal(next(skeys), (self.dims.n, self.dims.n))/jnp.sqrt(self.dims.n)
-        whu = self.rad * jr.normal(next(skeys), (self.dims.n, self.dims.m))/jnp.sqrt(self.dims.n)
-        bz = jnp.zeros((self.dims.n,1))
-        br = jnp.zeros((self.dims.n,1))
-        bh = jnp.zeros((self.dims.n,1))
-        if self.ext_inputs : 
-            return GRUParams(
-                wru=wru, wrx=wrx, wzx=wzx, wzu=wzu, whx=whx, whu=whu, br=br, bz=bz, bh=bh, 
-                wzu_ext = jnp.zeros((self.dims.n, self.m_ext)), wru_ext = jnp.zeros((self.dims.n, self.m_ext)), whu_ext = 
-                jnp.zeros((self.dims.n, self.m_ext))
-            )
-
-        else : 
-            return GRUParams(
-                wru=wru, wrx=wrx, wzx=wzx, wzu=wzu, whx=whx, whu=whu, br=br, bz=bz, bh=bh
-            )
-
-    def dynamics_t(
-        self, params: GRUParams, x_t: jnp.ndarray, u_t: jnp.ndarray, t: int, ext_t: Any
-    ) -> jnp.ndarray:
-        x_t, u_t, ext_t = x_t.reshape(-1,1), u_t.reshape(-1,1), ext_t.reshape(-1,1)
-        wzu = params.wzu / jnp.linalg.norm(1e-5 + params.wzu, axis = 0)
-        wru = params.wru / jnp.linalg.norm(1e-5 + params.wru, axis = 0)
-        whu = params.whu / jnp.linalg.norm(1e-5 + params.whu, axis = 0)
-        z_t = self.phi(params.bz + jnp.dot(params.wzx, x_t) + jnp.dot(wzu, u_t) + jnp.dot(params.wzu_ext, ext_t))
-        r_t = self.phi(params.br + jnp.dot(params.wrx, x_t) + jnp.dot(wru, u_t) + jnp.dot(params.wru_ext, ext_t))
-        hh_t = self.rho(params.bh + jnp.dot(params.whx, r_t * x_t) + jnp.dot(whu, u_t) + jnp.dot(params.whu_ext, ext_t))
-        nx_t = (1.0 - z_t) * x_t + z_t * hh_t
-        return nx_t.squeeze()
-
-    def run_dynamics(self, params, x0, us, ts, exts):
-        _, xs = lax.scan(make_dyn_for_scan(self.dynamics_t, params), x0, (us, ts, exts))
-        return xs
-    
-
-
-
-class VRNN_Ext(Dynamics):  
-    def __init__(self, phi: Callable[[jnp.ndarray], jnp.ndarray], dt: float, dims: Dims, rad=0.9, m_ext=None):
-        self.dims = dims
-        self.phi = phi
-        self.rad = rad
-        self.n = dims.n
-        self.m = dims.m
-        self.m_ext = self.m if m_ext is None else m_ext
-        self.max_eig = 0.95
-        self.dt = dt
-
-    def initialize_params(self, key) -> VanillaExtParams:
-        keys = jr.split(key, 3)
-        a = self.rad * jr.normal(keys[0], (self.n, self.n)) / jnp.sqrt(self.n)
-        #init_max_eig = jnp.max(jnp.abs(jnp.linalg.eigvals(a)))
-        #a = a / init_max_eig * self.max_eig
-        b = jr.normal(keys[1], (self.n, self.m))
-        bias = jnp.zeros((self.n))
-        b_ext = 0.1*jr.normal(keys[2], (self.n, self.m_ext))
-        return VanillaExtParams(a=a, b=b, bias=bias, b_ext=b_ext)
-
-    def dynamics_t(
-        self,
-        params: VanillaExtParams,
-        x_t: jnp.ndarray,
-        u_t: jnp.ndarray,
-        t: int,
-        ext_t: jnp.ndarray,
-    ) -> jnp.ndarray:
-        b = params.b / jnp.linalg.norm(params.b, axis = 0) ##renormalize outside dyn_t
-        b_ext = params.b_ext 
-        x_t = np.reshape(x_t, (-1,))
-        u_t = np.reshape(u_t, (-1,))
-        ext_t = np.reshape(ext_t, (-1,))
-        nx = (params.a @ self.phi(x_t)) + (b @ u_t) + b_ext @ ext_t + params.bias
-        return nx #_t + dx*self.dt
-    
-    
-    def run_dynamics(
-        self,
-        params: VanillaExtParams,
-        x0: jnp.ndarray,
-        us: jnp.ndarray,
-        ts: int,
-        ext_ts: jnp.ndarray,
-    ):
-        _, xs = lax.scan(
-            make_dyn_for_scan(self.dynamics_t, params), x0, (us, ts, ext_ts)
-        )
-        return xs
-    
-    def save_params(self, dyn_params: VanillaParams, saving_dir: str, flag: Optional[int]):
-        w_eig, _ = np.linalg.eig(dyn_params.a)
-        np.savetxt(f"{saving_dir}/eig{flag}", w_eig)
-        np.savez(f"{saving_dir}/dyn_prms{flag}.npz", w_eig=w_eig, **dyn_params._asdict())
-    
-
-
-class ParallelLinear(Dynamics): ##no external input here 
+class ParallelLinear(Dynamics): 
+    """ This module implements linear dynamics, but evaluates them in parallel (usinga parallel scan) instead of sequentially.
+    This will only be advantageous on GPU, and we expect to see big speed improvements over a sequential evaluation only when the sequences are long."""
     def __init__(
         self,
         dims=None,

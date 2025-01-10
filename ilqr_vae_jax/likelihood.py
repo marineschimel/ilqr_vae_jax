@@ -146,12 +146,10 @@ class Poisson(Likelihood):
     
     
     def sample_pre_o(self, likelihood_params: PoissonLikelihoodP, x_t: Array):
-        #mu_t = likelihood_params.c@x_t + likelihood_params.bias
         mu_t = self.dt*self.phi(likelihood_params.c@x_t + likelihood_params.bias)
         return mu_t.reshape((self.n_out,))
     
     def sample_o(self, likelihood_params: PoissonLikelihoodP, pre_o_t: Array, key: PRNGKey):
-        #mu_t = self.phi(likelihood_params.c@x_t + likelihood_params.bias)#*likelihood_params.gain
         return random.poisson(key, pre_o_t.reshape((self.n_out,)))
     
     def sample_pre_os(self, likelihood_params: PoissonLikelihoodP, xs: Array):

@@ -16,9 +16,9 @@ n_encoder = 64
 n_controller = 64
 
 
-##define a default Dataloader there
-
 class Dataloader():
+    """This is a custom dataloader for the library. Note that this can be mofidied for specific applications,
+    but the save_test_data and sample_test_data are required in the vae module"""
     def __init__(self, dims, data, batch_size, test_data):
         os, us, ext_us = data
         self.dims = dims

@@ -32,7 +32,10 @@ class VAE:
     - encoder : the encoder model (e.g a biRNN for LFADS, or iLQR)
     - coupler : the coupler model (this is just for LFADS, it couples the encoder and the dynamics, in a way that mirrors the structure of a Kalman filter)
     - dataloader : the dataloader object that will be used to sample data
-    - dims : the dimensions of the data / model"""
+    - dims : the dimensions of the data / model
+    Functions : 
+    - ELBO computation. The trianing objective is the negative ELBO + regularizer (which we are trying to minimize). 
+    - Training loop"""
     def __init__(self, dynamics: Any, prior: Any, likelihood: Any, encoder: Any, coupler: Any, dataloader: Any, dims: Dims, inputs_allowed: int = 1, saving_dir = 'results', training_hparams = default_training_hparams, shmap = False, checkpoint = None, dropout = None, dropout_rate = None, params = None):
         self.shmap = shmap
         self.dynamics = dynamics
@@ -46,19 +49,18 @@ class VAE:
         self.dims = dims
         self.inputs_allowed = inputs_allowed
         self.saving_dir = saving_dir
-        self.shmap = shmap
+        self.shmap = shmap #this option is useful if we have a multi-CPU machine and we are using the iLQR algorithm. In this case, we can parallelize using shmap, which distributes the ELBO computation (and thus iLQR computation) across CPUs and can lead to a big speed increase.
         self.training_hparams = training_hparams
         self.save_every = 1000
         self.checkpoint = checkpoint
         self.dropout = dropout
-        self.dropout_rate = 0.1 if dropout_rate is None else dropout_rate
+        self.dropout_rate = 0.1 if dropout_rate is None else dropout_rate 
         self.params = params
         self.metrics = []
         self.max_grad_norm = 100.0
         self.warm_start = True
         self.flag = None
-        self.verbose = True
-        self.forced_autonomous = False
+        self.verbose = True 
         self.losses = []
 
     def clip_single_example(self, grads):
@@ -107,32 +109,28 @@ class VAE:
         raise NotImplementedError('direct evaluation of this function is not implemented')
 
     def entropy(self, gaussian_cov, dimension):
-        # sample from the posterior
-        # evaluate log of posterior sample and substract log prior
-        # assume something of size T x k x k and
-        # reshape into (T) x k x k and
         ld = jnp.sum(jnp.log(gaussian_cov))
         return 0.5*(dimension * (1 + jnp.log(2*jnp.pi)) + ld) 
 
-    def elbo(self, params, data_enc, data_dec, key, kl_warmup):
-        # data_enc, data_dec = data
-        ts, exts, obs_enc = data_enc
+    def neg_elbo(self, params, data_enc, data_dec, key, kl_warmup):
+        """This function computes the ELBO for one data sequence.
+        ELBO = \mathbb{E}_q(u) [\log p(y|x(u)) + KL(q(u)||p(u))]
+            = \mathbb{E}_q(u) [\log p(y|x(u)) + \log p(u) - \log q(u)] 
+            = \mathbb{E}_q(u) [log likelihood + log prior + entropy] 
+        In practice, we also include a function \beta(iteration) that is weighing the KL term. 
+        This function computes the loss for a single training example : we then vmap it over a batch in batch_elbo."""
+        ts, exts, _ = data_enc
         _, _, obs_dec = data_dec
         data_dec = (ts, exts, obs_dec)
         key, subkey = random.split(key)
-        time_pre_enc = time.time()
         ic_mean, ic_logstd, us_mean, us_logstd = self.encoder.get_posterior_mean_and_cov(params, key, data_enc, self.inputs_allowed)
-        time_post_enc = time.time()
         ic_samples, c_samples, x_samples, o_samples, pre_o_samples, cs_logstd, cs_mean = self.posterior_sample(params, ic_mean, ic_logstd, us_mean, us_logstd, ts, exts, subkey)
-        time_dyn = time.time() - time_post_enc
-        time_enc = time_post_enc - time_pre_enc
         cs_cov = jax.vmap(lambda x : jax.nn.softplus(x)**2 + 1e-3)(cs_logstd)
         ic_cov = jax.nn.softplus(ic_logstd)**2 + 1e-3
         us_entropy = self.inputs_allowed*jnp.sum(jax.vmap(self.entropy, in_axes = (0, None))(cs_cov, self.dims.m))
         us_entropy += self.inputs_allowed*0.5*jnp.sum((cs_mean[None] - c_samples)**2/cs_cov)
         ic_entropy = self.entropy(ic_cov, self.dims.n)
         entropy =  (ic_entropy + us_entropy)
-        ##add the prior for the intiial condition
         lp_ic = jnp.sum(jax.vmap(self.prior.log_prior_ic, in_axes = (None, 0))(params.prior_params, ic_samples))
         lp_us = jnp.sum(jax.vmap(self.prior.log_prior, in_axes = (None, 0))(params.prior_params, c_samples))
         ll = jnp.sum(jax.vmap(self.likelihood.log_likelihood, in_axes = (None, 0, None))(params.likelihood_params, x_samples, data_dec)) #not o because we learn readout!!
@@ -163,7 +161,7 @@ class VAE:
 
     def batch_neg_elbo(self, params, batch_data, keys, kl_warmup):
         data_batch_enc, data_batch_dec = batch_data
-        losses, (log_likelihood, entropy, log_prior, samples) = jax.vmap(self.elbo, in_axes = (None, 0, 0, 0, None))(params, data_batch_enc, data_batch_dec, keys, kl_warmup)
+        losses, (log_likelihood, entropy, log_prior, samples) = jax.vmap(self.neg_elbo, in_axes = (None, 0, 0, 0, None))(params, data_batch_enc, data_batch_dec, keys, kl_warmup)
         return jnp.mean(losses) + self.training_hparams.regularizer(params), (jnp.ones(1)*(jnp.mean(losses) + self.training_hparams.regularizer(params)), (jnp.ones(1)*jnp.mean(log_likelihood), jnp.ones(1)*jnp.mean(entropy), jnp.ones(1)*jnp.mean(log_prior), samples))
 
     @partial(jax.jit, static_argnums=(0,3,))
@@ -221,7 +219,9 @@ class VAE:
         test_ll = self.likelihood.get_metric(preds, true)
         return s1, s2, pre_o_samples, (test_ll, ll, entropy, lp)
 
+
     def train(self):
+        """This is the training loop : it does not have an explicit output but updates parameters at every iteration."""
         if self.shmap :
             train_fn = self.train_step_shmap
             data_axis_name = "data"
@@ -259,10 +259,6 @@ class VAE:
         # initialize hidden states
         for epoch in range(self.training_hparams.num_epochs):
             num_batches = 0
-            if self.forced_autonomous:   
-                #self.prior.inputs_allowed = jnp.exp((-epoch/5))
-                if self.params is not None :
-                    self.params.prior_params._replace(log_std_u = jnp.ones_like(self.params.prior_params.log_std_u)*jnp.exp((-epoch/5)))
             for ts, exts, obs, idxs in dataloader:
                 num_batches += 1
                 key, subkey = jax.random.split(key)
