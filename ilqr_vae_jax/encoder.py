@@ -255,19 +255,22 @@ class iLQR(Encoder):
         )
         full_params = iLQRParams(x0=jnp.zeros((self.n,)), theta=params)
 
-        #@chex.assert_max_traces(n = 3)
+        @chex.assert_max_traces(n = 3)
         def checked_dilqr(model, p, us, max_iter, use_linesearch, lin_dyn, lin_cost, quad_cost):
             return dilqr(model, p, us, max_iter = max_iter, use_linesearch=use_linesearch) #, lin_dyn = lin_dyn) #, lin_cost = lin_cost, quad_cost = quad_cost)
 
         #try : 
-        tau_star = checked_dilqr(
+        tau_star, costs = checked_dilqr(
             model,
             full_params,
             0.*jax.random.normal(key = key, shape = (self.horizon + self.n_beg, self.m)),
             max_iter = 8,
             use_linesearch=self.use_linesearch,
             lin_dyn = lin_dyn, lin_cost = None, quad_cost = None)
+        tau_star = jax.lax.cond(costs[-1] < costs[0], lambda: tau_star, lambda: jnp.zeros_like(tau_star))
         return tau_star
+       # except : 
+         #   return jnp.zeros_like(jnp.zeros((self.horizon + self.n_beg + 1, self.n + self.m)))   
 
     def get_posterior_mean_and_cov(
         self, params: VAEParams, key: PRNGKey, data: Tuple[Any], inputs_allowed: int = 1

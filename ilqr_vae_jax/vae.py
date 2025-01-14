@@ -71,6 +71,7 @@ class VAE:
         return utils.clip_single_example(grads, self.max_grad_norm) if self.training_hparams.clip_grads else jax.tree_map(lambda g : jnp.mean(g, axis = 0), grads)
 
     def initialize_params(self, key):
+        """ This function initializes the parameters of the VAE model."""
         keys = random.split(key, 5)
         prior_params = self.prior.initialize_params(keys[0])
         likelihood_params = self.likelihood.initialize_params(keys[1])
@@ -80,8 +81,7 @@ class VAE:
         return VAEParams(coupling_params = coupling_params, encoder_params = encoder_params,dyn_params = dynamics_params, prior_params = prior_params, likelihood_params = likelihood_params)  
 
     def posterior_sample(self, params: VAEParams, ic_mean, ic_logstd, us_mean, us_logstd, ts, exts, key):
-        # run data through the encoder
-        # sample from the posterior
+        """This function samples from the posterior distribution of the latent variables."""
         key, subkey = random.split(key)
         subkey, subsubkey = random.split(subkey)
         num_samples = self.training_hparams.num_samples
@@ -97,6 +97,9 @@ class VAE:
         return ic_samples, c_samples, x_samples, o_samples, pre_o_samples, cs_logstd, cs_mean
 
     def get_kl_warmup_fun(self):
+        """This function returns a function that computes the KL warmup schedule. 
+        Output : kl_warmup, a function that takes in the iteration number, and outputs the coefficient weighing the KL term in the ELBO.
+        """
         kl_warmup_start = 0 
         kl_warmup_end = self.training_hparams.kl_warmup_end
         kl_min = 0
@@ -109,10 +112,8 @@ class VAE:
             return np.where(batch_idx > kl_warmup_end, kl_max, kl_warmup)
         return kl_warmup
 
-    def kl_divergence(self, params):
-        raise NotImplementedError('direct evaluation of this function is not implemented')
-
     def entropy(self, gaussian_cov, dimension):
+        """This computes the analytical entropy of a Gaussian distribution (see eg https://gregorygundersen.com/blog/2020/09/01/gaussian-entropy/)"""
         ld = jnp.sum(jnp.log(gaussian_cov))
         return 0.5*(dimension * (1 + jnp.log(2*jnp.pi)) + ld) 
 
@@ -144,6 +145,7 @@ class VAE:
         return -(ll + kl_warmup*(lp_us + lp_ic + entropy))/(self.training_hparams.num_samples*self.dims.horizon*self.dims.n_out), (ll, entropy,  (lp_us + lp_ic), (jnp.mean(c_samples, axis = 0), jnp.mean(x_samples, axis = 0), jnp.mean(pre_o_samples, axis = 0)))
 
     def get_sample(self, params, data, key):
+        """ This function return posterior samples for a given data sequence."""
         data_enc, data_dec = data
         ts, exts, obs_enc = data_enc
         _, _, obs_dec = data_dec
@@ -196,7 +198,7 @@ class VAE:
         """This function is still in development : the idea is to use shmap to parallelize over devices (e.g CPUs) in cases
     where data parallelization is more efficient that GPU parallelization (e.g with the naive iLQR implementation).
     This will only be called to train the model if the shmap option is on.
-    Right now the parallelization doesn't work exactly as intended so this function will not return exactly the same output as train_step."""
+    This function should be used with care as there may be edge cases where the shmap implementation does not yield the same output as the vmap one."""
         device_array = np.array(jax.devices())
         data_axis_name = "data"
         keys = jax.random.split(key, self.training_hparams.batch_size) #(n_devices, batch_size // n_devices))
