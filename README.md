@@ -15,4 +15,13 @@ We also implement two options for the encoder in the VAE : one implements the  [
 - **Custom encoder module**: Two potential encoders are implemented -- an iLQR-based encoder and a biRNN-based encoder. 
 
 
-## Requirements
+## Installation
+
+```bash
+git clone git@github.com:marineschimel/ilqr_vae_jax.git
+cd ilqr_vae_jax
+python3 -m venv .venv
+source ./.venv/bin/activate
+pip install -e .
+pip install -r requirements.txt
+```

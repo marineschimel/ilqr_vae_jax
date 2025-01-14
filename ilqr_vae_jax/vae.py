@@ -6,7 +6,7 @@ from flax.core.frozen_dict import FrozenDict
 from jax.random import PRNGKey
 import optax, sys
 from typing import Any, NamedTuple
-sys.path.append('..')
+# sys.path.append('..')
 from ilqr_vae_jax.encoder import *
 from ilqr_vae_jax import utils
 from ilqr_vae_jax.utils import *

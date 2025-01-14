@@ -1,0 +1,8 @@
+matplotlib
+numpy
+jax
+optax
+flax
+chex
+h5py
+diffilqrax

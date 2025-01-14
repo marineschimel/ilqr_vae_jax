@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 from jax import lax
 import jax, sys
-sys.path.append('..')
+# sys.path.append('..')
 from ilqr_vae_jax import dynamics
 from ilqr_vae_jax.encoder import *
 from ilqr_vae_jax.utils import *

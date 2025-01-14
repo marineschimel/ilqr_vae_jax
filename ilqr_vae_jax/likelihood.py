@@ -2,7 +2,7 @@ from jax import random, vmap, scipy
 import sys
 import jax.numpy as jnp
 from jax import Array, nn
-sys.path.append('..')
+# sys.path.append('..')
 from ilqr_vae_jax.utils import *
 from jax.random import PRNGKey
 from typing import NamedTuple, Union, Optional
