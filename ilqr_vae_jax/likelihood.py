@@ -24,12 +24,14 @@ class Likelihood(object):
     """
     The likelihood model class, p(o|z). 
     Each likelihood implements its methods.
+    
     The methods that are exposed from the outside are:
         - initialize_params : takes in a random key and initializes the likelihood-specific parameters
         - log_likelihood_t : takes in the likelihood parameters, the current state, and the current observation, and returns the log likelihood of the observation given the state at time t
         - log_likelihood : takes in the likelihood parameters, the time series of states, and the time series of observations, and returns the log likelihood of the observations given the states (a scalar value, summed across all times)
         - sample_pre_os : takes in the likelihood parameters, the current state, and a random key, and returns a time series of the predicted mean of the likelihood distribution
         - sample_os : takes in the likelihood parameters, the current state, and a random key, and returns a time sereis of samples from the likelihood distribution
+        - get_metric : takes in the likelihood prediction, the time series of observation, and returns a score of models performance
         - save_params : takes in the likelihood parameters and a saving directory, and saves the likelihood parameters in the saving directory
     """
     def __init__(self, dims=None):
@@ -49,6 +51,10 @@ class Likelihood(object):
     
     def sample_os(self, likelihood_params, xs, keys):
         raise NotImplementedError('direct evaluation of this function is not implemented')
+    
+    def get_metric(self, preds, data):
+        raise NotImplementedError('direct evaluation of this function is not implemented')
+    
     def save_params(self, lik_params:Union[GaussianLikelihoodP, PoissonLikelihoodP], saving_dir: str,flag: Optional[int]
     ):
         flag = "" if flag is None else flag
