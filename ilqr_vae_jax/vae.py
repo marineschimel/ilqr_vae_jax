@@ -6,8 +6,12 @@ from flax.core.frozen_dict import FrozenDict
 from jax.random import PRNGKey
 import optax, sys
 from typing import Any, NamedTuple
-sys.path.append('..')
+# sys.path.append('..')
 from ilqr_vae_jax.encoder import *
+from ilqr_vae_jax.dynamics import Dynamics
+from ilqr_vae_jax.prior import Prior
+from ilqr_vae_jax.likelihood import Likelihood
+from ilqr_vae_jax.coupler import Coupler
 from ilqr_vae_jax import utils
 from ilqr_vae_jax.utils import *
 from ilqr_vae_jax.defaults import default_training_hparams
@@ -36,7 +40,7 @@ class VAE:
     Functions : 
     - ELBO computation. The trianing objective is the negative ELBO + regularizer (which we are trying to minimize). 
     - Training loop"""
-    def __init__(self, dynamics: Any, prior: Any, likelihood: Any, encoder: Any, coupler: Any, dataloader: Any, dims: Dims, inputs_allowed: int = 1, saving_dir = 'results', training_hparams = default_training_hparams, shmap = False, checkpoint = None, dropout = None, dropout_rate = None, params = None):
+    def __init__(self, dynamics: Dynamics, prior: Prior, likelihood: Likelihood, encoder: BiRNN|iLQR|ParalleliLQR, coupler: Coupler, dataloader: Any, dims: Dims, inputs_allowed: int = 1, saving_dir = 'results', training_hparams = default_training_hparams, shmap = False, checkpoint = None, dropout = None, dropout_rate = None, params = None):
         self.shmap = shmap
         self.dynamics = dynamics
         self.prior = prior
@@ -114,9 +118,12 @@ class VAE:
 
     def neg_elbo(self, params, data_enc, data_dec, key, kl_warmup):
         """This function computes the ELBO for one data sequence.
-        ELBO = \mathbb{E}_q(u) [\log p(y|x(u)) + KL(q(u)||p(u))]
-            = \mathbb{E}_q(u) [\log p(y|x(u)) + \log p(u) - \log q(u)] 
-            = \mathbb{E}_q(u) [log likelihood + log prior + entropy] 
+        
+        .. math::
+            ELBO = \mathbb{E}_q(u) [\log p(y|x(u)) + KL(q(u)||p(u))]
+                = \mathbb{E}_q(u) [\log p(y|x(u)) + \log p(u) - \log q(u)] 
+                = \mathbb{E}_q(u) [log likelihood + log prior + entropy] 
+        
         In practice, we also include a function \beta(iteration) that is weighing the KL term. 
         This function computes the loss for a single training example : we then vmap it over a batch in batch_elbo."""
         ts, exts, _ = data_enc
@@ -228,12 +235,12 @@ class VAE:
             device_array = np.array(jax.devices())
             mesh = Mesh(device_array,  (data_axis_name,))
             sample_fn = shard_map(
-        self.get_samples,
-        mesh,
-        in_specs=(P(), P(data_axis_name), P(data_axis_name)),
-        out_specs=(P()),
-        check_rep=False,
-    )
+                self.get_samples,
+                mesh,
+                in_specs=(P(), P(data_axis_name), P(data_axis_name)),
+                out_specs=(P()),
+                check_rep=False,
+            )
             print(f'WARNING : shmap is on so we need to ensure that the number of active devices is {self.training_hparams.batch_size}')
         else :
             train_fn = self.train_step

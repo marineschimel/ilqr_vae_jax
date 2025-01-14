@@ -2,7 +2,7 @@ from jax import random, vmap, nn
 import jax.numpy as jnp
 import sys
 
-sys.path.append("..")
+# sys.path.append("..")
 
 from ilqr_vae_jax.utils import *
 from typing import NamedTuple
@@ -68,7 +68,7 @@ class Prior(object):
 class Gaussian(Prior):
     def __init__(self, dims: Dims, full_ic:bool = True, prior_logstd : float = 1.0):
         """
-        Note, if you aren't using ilqr, you should set full_ic to True
+        :Notes:`If you aren't using ilqr, you should set full_ic to True`
         """
         self.m = dims.m
         self.n = dims.n
