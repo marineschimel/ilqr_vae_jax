@@ -13,8 +13,7 @@ from typing import Any, Tuple
 import chex
 import pdb
 
-sys.path.append("..")
-from diffilqrax import ilqr, lqr
+# sys.path.append("..")
 from diffilqrax.diff_ilqr import dilqr
 from diffilqrax.typs import System, ModelDims, iLQRParams, ParallelSystem
 from diffilqrax.parallel_dilqr import parallel_dilqr
@@ -262,12 +261,12 @@ class iLQR(Encoder):
 
         #try : 
         tau_star = checked_dilqr(
-        model,
-        full_params,
-        0.*jax.random.normal(key = key, shape = (self.horizon + self.n_beg, self.m)),
-        max_iter = 8,
-        use_linesearch=self.use_linesearch
-        ,lin_dyn = lin_dyn, lin_cost = None, quad_cost = None)
+            model,
+            full_params,
+            0.*jax.random.normal(key = key, shape = (self.horizon + self.n_beg, self.m)),
+            max_iter = 8,
+            use_linesearch=self.use_linesearch,
+            lin_dyn = lin_dyn, lin_cost = None, quad_cost = None)
         return tau_star
 
     def get_posterior_mean_and_cov(

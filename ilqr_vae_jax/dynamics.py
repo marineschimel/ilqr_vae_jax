@@ -14,7 +14,7 @@ from ilqr_vae_jax.utils import bmm
 
 import pdb
 
-sys.path.append("..")
+# sys.path.append("..")
 from ilqr_vae_jax.typs import *
 
 @jax.vmap
@@ -89,7 +89,7 @@ class Dynamics(object):
 
 # flax pytree
 class VRNN(Dynamics):
-    """ Thismodule implements vanilla RNN dynamics of the form x(t+1) = A\Phi(x(t)) +Bu(t) + B_p p(t)"""
+    r""" This module implements vanilla RNN dynamics of the form :math:`x(t+1) = A\Phi(x(t)) + Bu(t) + B_p p(t)`"""
     def __init__(self, phi: Callable[[jnp.ndarray], jnp.ndarray], dims: Dims, rad=0.7):
         self.dims = dims
         self.phi = phi
