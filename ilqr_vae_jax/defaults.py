@@ -8,9 +8,9 @@ import optax
 
 optimizer = optax.adam
 batch_size = 32
-num_samples = 10
+num_samples = 1
 lr_scheduler = optax.cosine_decay_schedule(init_value = 1e-3, decay_steps = 10000)
-default_training_hparams = typs.TrainingHParams(num_samples = num_samples, kl_warmup_end = 1000, optimizer = optimizer, num_epochs = 10, batch_size = batch_size, clip_grads = True, regularizer = lambda params : 0, lr_scheduler = lr_scheduler, total_num_datapoints = None)
+default_training_hparams = typs.TrainingHParams(num_samples = num_samples, kl_warmup_end = 200, optimizer = optimizer, num_epochs = 10, batch_size = batch_size, clip_grads = True, regularizer = lambda params : 0, lr_scheduler = lr_scheduler, total_num_datapoints = None)
 ## optional dimension defaults
 n_encoder = 64
 n_controller = 64

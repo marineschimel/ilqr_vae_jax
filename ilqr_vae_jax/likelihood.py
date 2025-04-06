@@ -127,14 +127,15 @@ class Poisson(Likelihood):
         self.phi = jnp.exp #jax.nn.softplus
         self.fixed_id = fixed_id
         self.dt = dt
+        self.bias = None
         
         
     def ll_function(self, mu_t, data_t):
         return scipy.stats.poisson.logpmf(data_t, mu_t)
         
     def initialize_params(self, key) -> PoissonLikelihoodP:
-        c = random.normal(key, shape = (self.n_out, self.n))/jnp.sqrt(self.n + self.n_out)
-        bias = jnp.zeros(shape = (self.n_out,))
+        c = random.normal(key, shape = (self.n_out, self.n))/jnp.sqrt(self.n)
+        bias = jnp.zeros(shape = (self.n_out,)) if self.bias is None else self.bias
         gain = jnp.zeros(shape = (self.n_out,))
         return PoissonLikelihoodP(c = c, bias = bias, gain = gain)
     

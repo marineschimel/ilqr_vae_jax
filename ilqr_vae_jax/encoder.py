@@ -260,14 +260,14 @@ class iLQR(Encoder):
             return dilqr(model, p, us, max_iter = max_iter, use_linesearch=use_linesearch) #, lin_dyn = lin_dyn) #, lin_cost = lin_cost, quad_cost = quad_cost)
 
         #try : 
-        tau_star, costs = checked_dilqr(
+        tau_star = checked_dilqr(
             model,
             full_params,
             0.*jax.random.normal(key = key, shape = (self.horizon + self.n_beg, self.m)),
             max_iter = 8,
             use_linesearch=self.use_linesearch,
             lin_dyn = lin_dyn, lin_cost = None, quad_cost = None)
-        tau_star = jax.lax.cond(costs[-1] < costs[0], lambda: tau_star, lambda: jnp.zeros_like(tau_star))
+        #tau_star = jax.lax.cond(costs[-1] < costs[0], lambda: tau_star, lambda: jnp.zeros_like(tau_star))
         return tau_star
        # except : 
          #   return jnp.zeros_like(jnp.zeros((self.horizon + self.n_beg + 1, self.n + self.m)))   

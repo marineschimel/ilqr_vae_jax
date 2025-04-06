@@ -136,8 +136,8 @@ class VAE:
         cs_cov = jax.vmap(lambda x : jax.nn.softplus(x)**2 + 1e-3)(cs_logstd)
         ic_cov = jax.nn.softplus(ic_logstd)**2 + 1e-3
         us_entropy = self.inputs_allowed*jnp.sum(jax.vmap(self.entropy, in_axes = (0, None))(cs_cov, self.dims.m))
-        us_entropy += self.inputs_allowed*0.5*jnp.sum((cs_mean[None] - c_samples)**2/cs_cov)
-        ic_entropy = self.entropy(ic_cov, self.dims.n)
+        us_entropy += self.inputs_allowed*0.5*jnp.sum((cs_mean - c_samples)**2/cs_cov)
+        ic_entropy = self.entropy(ic_cov, self.dims.n)*self.training_hparams.num_samples #+ 0.5*jnp.sum((ic_mean[None] - ic_samples)**2/ic_cov[None])
         entropy =  (ic_entropy + us_entropy)
         lp_ic = jnp.sum(jax.vmap(self.prior.log_prior_ic, in_axes = (None, 0))(params.prior_params, ic_samples))
         lp_us = jnp.sum(jax.vmap(self.prior.log_prior, in_axes = (None, 0))(params.prior_params, c_samples))
